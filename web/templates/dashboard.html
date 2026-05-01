@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}Kia Connect{% endblock %}
+
+{% block header_right %}
+<div class="flex items-center gap-3" x-data="{ r: false }">
+    <button @click="r=true; location.reload()" class="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+        <svg class="w-[18px] h-[18px] text-white/60" :class="r && 'animate-spin'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+    </button>
+    <div class="w-2 h-2 rounded-full bg-k-greenBright pulse-dot" x-data x-show="$store.d.ok"></div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div x-data x-init="$store.d.load()">
+
+    <!-- Loading State -->
+    <div x-show="$store.d.loading" class="pt-6">
+        <div class="text-center">
+            <img src="/static/car-hero.png" alt="" onerror="this.style.display='none'" class="mx-auto opacity-50" style="width:280px; height:auto;">
+            <p class="text-[14px] font-bold text-k-dark tracking-wide mt-2">Vehicle</p>
+            <p class="text-k-muted text-[12px] mt-1 pulse-dot">Connecting to car...</p>
+        </div>
+        <div class="mt-6 space-y-3">
+            <div class="grid grid-cols-2 gap-3"><div class="skel h-28"></div><div class="skel h-28"></div></div>
+            <div class="skel h-48"></div>
+            <div class="grid grid-cols-4 gap-2.5"><div class="skel h-16"></div><div class="skel h-16"></div><div class="skel h-16"></div><div class="skel h-16"></div></div>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div x-show="$store.d.err && !$store.d.loading" class="pt-12 text-center">
+        <img src="/static/car-hero.png" alt="" onerror="this.style.display='none'" class="mx-auto opacity-30" style="width:200px; height:auto;">
+        <p class="text-[14px] font-bold text-k-dark mt-4">Connection Failed</p>
+        <p class="text-k-muted text-[12px] mt-1" x-text="$store.d.err"></p>
+        <button @click="$store.d.load()" class="btn-red px-6 py-2.5 text-[13px] mt-4">Retry</button>
+    </div>
+
+    <!-- Loaded Content -->
+    <template x-if="$store.d.ok">
+    <div>
+    <!-- Car Hero -->
+    <section class="pt-6 pb-1 text-center slide-up" style="animation-delay:0.05s">
+        <img src="/static/car-hero.png" alt="" onerror="this.style.display='none'" class="mx-auto" style="width:280px; height:auto;">
+        <p class="text-[14px] font-bold text-k-dark tracking-wide mt-2" x-text="$store.d.name">Vehicle</p>
+        <p class="text-k-muted text-[12px] mt-0.5" x-text="$store.d.updated"></p>
+    </section>
+
+    <!-- Lock Badge -->
+    <div class="flex justify-center mt-4 slide-up" style="animation-delay:0.08s">
+        <div class="inline-flex items-center gap-2 px-5 py-2 rounded-full text-[13px] font-bold"
+             :class="$store.d.locked ? 'bg-k-greenDim text-k-green border border-k-green/20' : 'bg-k-redDim text-k-red border border-k-red/20'">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" x-show="$store.d.locked" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" x-show="!$store.d.locked" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+            </svg>
+            <span x-text="$store.d.locked ? 'Locked' : 'Unlocked'"></span>
+        </div>
+    </div>
+
+    <!-- Fuel + Battery -->
+    <section class="grid grid-cols-2 gap-3 mt-6 slide-up" style="animation-delay:0.12s">
+        <div class="kcard p-4">
+            <div class="flex items-center justify-between mb-3">
+                <span class="label">Fuel</span>
+                <svg class="w-4 h-4 text-k-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+            </div>
+            <p class="text-[32px] font-bold tabular-nums leading-none text-k-dark" x-text="$store.d.fuelPct + '%'">--</p>
+            <p class="text-k-muted text-[12px] mt-2"><span x-text="$store.d.fuelRange">--</span> km range</p>
+            <div class="bar-track mt-3">
+                <div class="bar-fill" :class="$store.d.fuelPct > 30 ? 'bg-k-green' : $store.d.fuelPct > 15 ? 'bg-k-amber' : 'bg-k-red'" :style="'width:' + $store.d.fuelPct + '%'"></div>
+            </div>
+        </div>
+        <div class="kcard p-4">
+            <div class="flex items-center justify-between mb-3">
+                <span class="label">12V Battery</span>
+                <svg class="w-4 h-4 text-k-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <p class="text-[32px] font-bold tabular-nums leading-none text-k-dark" x-text="$store.d.batPct + '%'">--</p>
+            <p class="text-k-muted text-[12px] mt-2" x-text="$store.d.batPct > 60 ? 'Healthy' : $store.d.batPct > 40 ? 'Fair' : 'Low'">--</p>
+            <div class="bar-track mt-3">
+                <div class="bar-fill" :class="$store.d.batPct > 60 ? 'bg-k-green' : $store.d.batPct > 40 ? 'bg-k-amber' : 'bg-k-red'" :style="'width:' + $store.d.batPct + '%'"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Map -->
+    <section class="mt-4 slide-up" style="animation-delay:0.16s">
+        <div class="kcard overflow-hidden">
+            <div id="dash-map" style="height:220px; z-index:1; border-radius:12px 12px 0 0;"></div>
+            <div class="px-4 pt-3 pb-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="label">Location</span>
+                    <a :href="$store.d.mapsUrl" target="_blank" class="text-[12px] text-k-red font-bold hover:text-k-redHover transition-colors">Open Maps</a>
+                </div>
+                <p class="text-[13px] text-k-sub leading-relaxed" x-text="$store.d.addr">Loading...</p>
+                <p class="text-[11px] text-k-muted mt-1"><span x-text="$store.d.odo">--</span> km</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Status Grid -->
+    <section class="grid grid-cols-4 gap-2.5 mt-4 slide-up" style="animation-delay:0.2s">
+        <template x-for="s in $store.d.stats" :key="s.l">
+            <div class="kcard p-3 text-center">
+                <div class="w-9 h-9 mx-auto mb-1.5 rounded-full flex items-center justify-center" :class="s.ok ? 'bg-k-greenDim' : 'bg-k-redDim'">
+                    <div class="w-3 h-3 rounded-full" :class="s.ok ? 'bg-k-green' : 'bg-k-red'"></div>
+                </div>
+                <p class="text-[11px] text-k-sub font-bold" x-text="s.l">--</p>
+            </div>
+        </template>
+    </section>
+
+    <!-- Quick Controls -->
+    <section class="mt-5 slide-up" style="animation-delay:0.24s">
+        <p class="label mb-3 px-0.5">Quick Controls</p>
+        <div class="grid grid-cols-4 gap-2.5">
+            <button @click="apiPost('lock', null, 'Locking...')" class="kcard kcard-hover p-3.5 text-center active:scale-95 transition-transform">
+                <svg class="w-[22px] h-[22px] mx-auto mb-1.5 text-k-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <p class="text-[10px] text-k-sub font-bold">Lock</p>
+            </button>
+            <button @click="apiPost('unlock', null, 'Unlocking...')" class="kcard kcard-hover p-3.5 text-center active:scale-95 transition-transform">
+                <svg class="w-[22px] h-[22px] mx-auto mb-1.5 text-k-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+                <p class="text-[10px] text-k-sub font-bold">Unlock</p>
+            </button>
+            <button @click="$dispatch('open-ac')" class="kcard kcard-hover p-3.5 text-center active:scale-95 transition-transform">
+                <svg class="w-[22px] h-[22px] mx-auto mb-1.5 text-k-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <p class="text-[10px] text-k-sub font-bold">AC</p>
+            </button>
+            <button @click="apiPost('horn', null, 'Honking...')" class="kcard kcard-hover p-3.5 text-center active:scale-95 transition-transform">
+                <svg class="w-[22px] h-[22px] mx-auto mb-1.5 text-k-red" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                <p class="text-[10px] text-k-sub font-bold">Horn</p>
+            </button>
+        </div>
+    </section>
+
+    <!-- Today -->
+    <section class="mt-5 slide-up" style="animation-delay:0.28s">
+        <div class="kcard p-4">
+            <div class="flex items-center justify-between mb-3">
+                <span class="label">Today's Driving</span>
+                <a href="/trips" class="text-[12px] text-k-red font-bold hover:text-k-redHover transition-colors">View All</a>
+            </div>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-[22px] font-bold tabular-nums leading-none text-k-dark" x-text="$store.d.todayKm">--</p>
+                    <p class="text-[10px] text-k-muted mt-1.5 font-bold tracking-wider">KM</p>
+                </div>
+                <div>
+                    <p class="text-[22px] font-bold tabular-nums leading-none text-k-dark" x-text="$store.d.todayTrips">--</p>
+                    <p class="text-[10px] text-k-muted mt-1.5 font-bold tracking-wider">TRIPS</p>
+                </div>
+                <div>
+                    <p class="text-[22px] font-bold tabular-nums leading-none text-k-dark" x-text="'₹' + $store.d.todayCost">--</p>
+                    <p class="text-[10px] text-k-muted mt-1.5 font-bold tracking-wider">FUEL</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Service -->
+    <section class="mt-4 mb-6 slide-up" style="animation-delay:0.32s" x-show="$store.d.svcItem">
+        <div class="kcard p-4 border-k-red/20">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-k-redDim flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-k-red" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-[14px] font-bold text-k-dark">Next Service</p>
+                    <p class="text-[12px] text-k-muted"><span x-text="$store.d.svcItem">--</span> in <span x-text="$store.d.svcKm">--</span> km</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    </div>
+    </template>
+
+    <!-- AC Modal -->
+    <div x-data="{ open: false, t: 22, m: 10 }" @open-ac.window="open = true">
+        <template x-if="open">
+            <div class="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" @click.self="open = false">
+                <div class="bg-white w-full max-w-lg rounded-t-2xl p-6 border-t border-k-border slide-up">
+                    <div class="w-10 h-1 bg-k-border rounded-full mx-auto mb-6"></div>
+                    <h3 class="text-[18px] font-bold text-k-dark mb-6">Climate Control</h3>
+                    <div class="flex items-center justify-between mb-5">
+                        <span class="text-k-sub text-[14px]">Temperature</span>
+                        <div class="flex items-center gap-3">
+                            <button @click="t = Math.max(16, t-1)" class="w-9 h-9 rounded-full border border-k-border flex items-center justify-center text-[16px] font-bold hover:bg-k-surface">-</button>
+                            <span class="text-[20px] font-bold tabular-nums w-14 text-center text-k-dark" x-text="t + '°C'"></span>
+                            <button @click="t = Math.min(30, t+1)" class="w-9 h-9 rounded-full border border-k-border flex items-center justify-center text-[16px] font-bold hover:bg-k-surface">+</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mb-6">
+                        <span class="text-k-sub text-[14px]">Duration</span>
+                        <div class="flex items-center gap-3">
+                            <button @click="m = Math.max(5, m-5)" class="w-9 h-9 rounded-full border border-k-border flex items-center justify-center text-[16px] font-bold hover:bg-k-surface">-</button>
+                            <span class="text-[20px] font-bold tabular-nums w-16 text-center text-k-dark" x-text="m + ' min'"></span>
+                            <button @click="m = Math.min(30, m+5)" class="w-9 h-9 rounded-full border border-k-border flex items-center justify-center text-[16px] font-bold hover:bg-k-surface">+</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="apiPost('climate/start', {temperature:t, duration:m}, 'Starting AC at '+t+'°C...'); open=false" class="btn-red py-3 text-[14px]">Start AC</button>
+                        <button @click="apiPost('climate/stop', null, 'Stopping AC...'); open=false" class="btn-outline py-3 text-[14px]">Stop AC</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.store('d', {
+        ok: false, loading: true, err: null,
+        name: 'Vehicle', updated: '', locked: true,
+        fuelPct: 0, fuelRange: '--', batPct: 0, addr: '', mapsUrl: '#', odo: '--',
+        todayKm: '--', todayTrips: '--', todayCost: '0', svcItem: null, svcKm: '--',
+        stats: [{ l:'Doors', ok:true },{ l:'Windows', ok:true },{ l:'Tires', ok:true },{ l:'AC Off', ok:false }],
+        _map: null, _retries: 0,
+
+        async load() {
+            // Show cached data instantly from localStorage
+            const cached = localStorage.getItem('kia_dash');
+            if (cached) {
+                try {
+                    const d = JSON.parse(cached);
+                    this._applyData(d);
+                    this.ok = true;
+                    this.loading = false;
+                } catch(e) {}
+            }
+
+            // Fetch fresh data in background
+            try {
+                const res = await fetch('/api/dashboard');
+                if (!res.ok) {
+                    if (!this.ok && this._retries < 2) {
+                        this._retries++;
+                        setTimeout(() => this.load(), 3000);
+                        return;
+                    }
+                    if (!this.ok) throw new Error('Server returned ' + res.status);
+                    return;
+                }
+                const d = await res.json();
+                if (d.error) { if (!this.ok) throw new Error(d.error); return; }
+                localStorage.setItem('kia_dash', JSON.stringify(d));
+                this._applyData(d);
+                this.ok = true;
+                this.loading = false;
+            } catch(e) {
+                if (!this.ok) { this.loading = false; this.err = e.message || 'Failed to connect'; }
+            }
+        },
+
+        _applyData(d) {
+                const s = d.status || {};
+                this.odo = s.odometer ? Math.round(s.odometer).toLocaleString() : '--';
+                if (s.last_updated_at) {
+                    const dt = new Date(s.last_updated_at);
+                    this.updated = dt.toLocaleString('en-IN', {hour:'2-digit', minute:'2-digit', day:'numeric', month:'short'});
+                }
+                const loc = d.location || {};
+                this.addr = loc.address || `${loc.latitude}, ${loc.longitude}`;
+                this.mapsUrl = loc.google_maps_link || '#';
+                const fuel = d.fuel || {};
+                this.fuelPct = fuel.fuel_level_percent || 0;
+                this.fuelRange = fuel.driving_range_km || '--';
+                this.locked = (d.locked || {}).is_locked;
+                this.batPct = (d.battery || {}).battery_12v_percent || 0;
+                const acOn = (d.climate || {}).ac_on || false;
+                this.stats = [
+                    { l:'Doors', ok: !s.front_left_door_is_open && !s.front_right_door_is_open && !s.back_left_door_is_open && !s.back_right_door_is_open },
+                    { l:'Windows', ok: !s.front_left_window_is_open && !s.front_right_window_is_open && !s.back_left_window_is_open && !s.back_right_window_is_open },
+                    { l:'Tires', ok: (d.tires || {}).all_ok !== false },
+                    { l: acOn ? 'AC On' : 'AC Off', ok: acOn },
+                ];
+                const t = d.trips || {};
+                if (t.summary) {
+                    this.todayKm = t.summary.distance_km || 0;
+                    this.todayTrips = t.trip_count || t.trips?.length || 0;
+                    const mpg = this.fuelRange !== '--' && this.fuelPct ? (this.fuelRange / (this.fuelPct / 100)) / 45 : 12.5;
+                    this.todayCost = Math.round((t.summary.distance_km || 0) / mpg * 105);
+                } else { this.todayKm = 0; this.todayTrips = 0; this.todayCost = 0; }
+                const sv = d.service || {};
+                if (sv.services?.length) { this.svcItem = sv.services[0].item; this.svcKm = sv.services[0].km_remaining; }
+                this._lat = (d.location || {}).latitude;
+                this._lon = (d.location || {}).longitude;
+                setTimeout(() => { try { this._initMap(this._lat, this._lon); } catch(e) {} }, 100);
+        },
+
+        _initMap(lat, lon) {
+            if (this._map || !lat || !lon) return;
+            const el = document.getElementById('dash-map');
+            if (!el) return;
+            this._map = L.map(el, { zoomControl: false, attributionControl: false }).setView([lat, lon], 16);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(this._map);
+            L.control.zoom({ position: 'topright' }).addTo(this._map);
+            const icon = L.divIcon({
+                html: `<div style="width:36px;height:36px;background:#bb162b;border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px rgba(187,22,43,0.4);display:flex;align-items:center;justify-content:center">
+                    <svg width="14" height="14" viewBox="0 0 68 34" fill="white"><path d="M39.4,23.11c0,0.12,0.04,0.2,0.11,0.2c0.05,0,0.1-0.02,0.16-0.06L60.65,9.62c0.37-0.24,0.71-0.37,1.21-0.37h4.61c0.71,0,1.18,0.47,1.18,1.18v8.8c0,1.06-0.24,1.68-1.18,2.25l-5.59,3.36c-0.07,0.05-0.13,0.07-0.19,0.07c-0.07,0-0.13-0.05-0.13-0.24l0-10.28c0-0.11-0.04-0.2-0.11-0.2c-0.05,0-0.1,0.02-0.16,0.06l-15.34,9.96c-0.43,0.28-0.78,0.36-1.18,0.36H33.61c-0.71,0-1.18-0.47-1.18-1.18V10.71c0-0.09-0.04-0.18-0.11-0.18c-0.05,0-0.1,0.02-0.16,0.06l-10.11,6.08c-0.1,0.06-0.13,0.11-0.13,0.16c0,0.04,0.02,0.08,0.09,0.16l7.22,7.22c0.1,0.1,0.16,0.17,0.16,0.25c0,0.09-0.11,0.12-0.23,0.12l-6.54,0c-0.51,0-0.91-0.08-1.18-0.35l-4.38-4.38c-0.04-0.04-0.08-0.07-0.13-0.07c-0.04,0-0.09,0.02-0.14,0.05l-7.33,4.4c-0.44,0.27-0.75,0.35-1.18,0.35H1.53c-0.71,0-1.18-0.47-1.18-1.18v-8.64c0-1.06,0.24-1.67,1.18-2.24l5.63-3.38C7.21,9.1,7.26,9.09,7.31,9.09c0.09,0,0.13,0.09,0.13,0.28v11.55c0,0.12,0.03,0.18,0.11,0.18c0.05,0,0.1-0.03,0.17-0.07L26.73,9.61c0.45-0.27,0.73-0.35,1.25-0.35h10.23c0.71,0,1.18,0.47,1.18,1.18V23.11z"/></svg>
+                </div>`,
+                className: '', iconSize: [36, 36], iconAnchor: [18, 18],
+            });
+            L.marker([lat, lon], { icon }).addTo(this._map);
+        },
+    });
+});
+</script>
+{% endblock %}

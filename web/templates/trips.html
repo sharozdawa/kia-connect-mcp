@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}Kia Connect — Trips{% endblock %}
+
+{% block extra_styles %}
+input[type="date"] { color-scheme: light; }
+input[type="month"] { color-scheme: light; }
+{% endblock %}
+
+{% block content %}
+<div x-data="tripsApp()" x-init="init()">
+
+    <!-- Tabs -->
+    <section class="pt-4 flex border-b border-k-border">
+        <button @click="tab='daily'; loadDaily()" class="flex-1 pb-3 text-[13px] font-bold tracking-wide text-center transition-colors relative"
+                :class="tab==='daily' ? 'text-k-dark' : 'text-k-muted'" :style="tab==='daily' && 'border-bottom:2px solid #bb162b; margin-bottom:-1px'">Daily</button>
+        <button @click="tab='monthly'; loadMonthly()" class="flex-1 pb-3 text-[13px] font-bold tracking-wide text-center transition-colors relative"
+                :class="tab==='monthly' ? 'text-k-dark' : 'text-k-muted'" :style="tab==='monthly' && 'border-bottom:2px solid #bb162b; margin-bottom:-1px'">Monthly</button>
+        <button @click="tab='insights'; loadInsights()" class="flex-1 pb-3 text-[13px] font-bold tracking-wide text-center transition-colors relative"
+                :class="tab==='insights' ? 'text-k-dark' : 'text-k-muted'" :style="tab==='insights' && 'border-bottom:2px solid #bb162b; margin-bottom:-1px'">Insights</button>
+    </section>
+
+    <!-- ====== DAILY TAB ====== -->
+    <template x-if="tab==='daily'">
+        <div>
+            <section class="pt-4 pb-2 slide-up">
+                <div class="flex items-center gap-2">
+                    <button @click="prevDay()" class="kcard p-2"><svg class="w-5 h-5 text-k-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg></button>
+                    <input type="date" :value="dateFmt" @change="setDate($event.target.value)" class="flex-1 kcard px-4 py-2.5 text-[14px] font-bold text-center text-k-dark focus:outline-none">
+                    <button @click="nextDay()" class="kcard p-2" :disabled="isToday"><svg class="w-5 h-5" :class="isToday?'text-k-light':'text-k-muted'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
+                    <button @click="setToday()" class="btn-outline px-3 py-2.5 text-[12px]">Today</button>
+                </div>
+            </section>
+
+            <div x-show="loading" class="mt-4"><div class="skel h-24 mb-3"></div><div class="skel h-56 mb-3"></div><div class="skel h-56"></div></div>
+            <div x-show="!loading && trips.length===0" class="mt-12 text-center">
+                <p class="text-k-muted text-[14px]">No trips on this date</p>
+            </div>
+
+            <!-- Day Summary + Fuel Cost -->
+            <section x-show="!loading && summary" class="mt-4 slide-up">
+                <div class="kcard p-4">
+                    <span class="label">Day Summary</span>
+                    <div class="grid grid-cols-5 gap-2 mt-3 text-center">
+                        <div><p class="text-[16px] font-bold tabular-nums text-k-dark" x-text="summary?.distance_km||0"></p><p class="text-[9px] text-k-muted font-bold">KM</p></div>
+                        <div><p class="text-[16px] font-bold tabular-nums text-k-dark" x-text="summary?.drive_time_min||0"></p><p class="text-[9px] text-k-muted font-bold">MIN</p></div>
+                        <div><p class="text-[16px] font-bold tabular-nums text-k-dark" x-text="summary?.avg_speed_kmh||0"></p><p class="text-[9px] text-k-muted font-bold">AVG</p></div>
+                        <div><p class="text-[16px] font-bold tabular-nums text-k-dark" x-text="summary?.max_speed_kmh||0"></p><p class="text-[9px] text-k-muted font-bold">MAX</p></div>
+                        <div><p class="text-[16px] font-bold tabular-nums text-k-dark" x-text="fuelCostStr"></p><p class="text-[9px] text-k-muted font-bold">FUEL ₹</p></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trip Cards -->
+            <section x-show="!loading && trips.length>0" class="mt-4 space-y-4">
+                <template x-for="(trip, i) in trips" :key="i">
+                    <div class="kcard overflow-hidden slide-up" :style="'animation-delay:'+(0.1+i*0.05)+'s'">
+                        <!-- Map with full route -->
+                        <div :id="'trip-map-'+i" style="height:200px;z-index:1;border-radius:12px 12px 0 0;" x-init="$nextTick(()=>loadAndDrawRoute(i,trip))"></div>
+
+                        <div class="p-4">
+                            <!-- Trip header -->
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-[13px] font-bold text-k-red">Trip <span x-text="i+1"></span></span>
+                                <span class="text-[12px] text-k-muted font-bold" x-text="(trip.start_time||'--')+' → '+(trip.end_time||'--')"></span>
+                            </div>
+
+                            <!-- From / To addresses -->
+                            <div class="space-y-2.5 mb-3">
+                                <div class="flex items-start gap-2.5">
+                                    <div class="w-3 h-3 rounded-full bg-k-green mt-0.5 flex-shrink-0 border-2 border-white shadow"></div>
+                                    <div>
+                                        <p class="text-[9px] text-k-muted font-bold tracking-wider mb-0.5">START</p>
+                                        <p class="text-[12px] text-k-sub leading-relaxed" x-text="trip.from_address||trip.from_gps||'Unknown'"></p>
+                                    </div>
+                                </div>
+
+                                <!-- Stops -->
+                                <template x-if="trip._route?.stops?.length > 0">
+                                    <div class="ml-1 pl-3 border-l-2 border-dashed border-k-border space-y-2">
+                                        <template x-for="(stop, si) in trip._route.stops" :key="si">
+                                            <div class="flex items-start gap-2.5">
+                                                <div class="w-2.5 h-2.5 rounded-full bg-k-amber mt-0.5 flex-shrink-0 border-2 border-white shadow"></div>
+                                                <div>
+                                                    <p class="text-[9px] text-k-muted font-bold tracking-wider">STOP <span x-text="si+1"></span></p>
+                                                    <p class="text-[11px] text-k-muted" x-text="stop.lat.toFixed(5)+', '+stop.lon.toFixed(5)"></p>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <div class="flex items-start gap-2.5">
+                                    <div class="w-3 h-3 rounded-full bg-k-red mt-0.5 flex-shrink-0 border-2 border-white shadow"></div>
+                                    <div>
+                                        <p class="text-[9px] text-k-muted font-bold tracking-wider mb-0.5">END</p>
+                                        <p class="text-[12px] text-k-sub leading-relaxed" x-text="trip.to_address||trip.to_gps||'Unknown'"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Route Stats -->
+                            <template x-if="trip._route">
+                                <div class="bg-k-surface rounded-lg p-3 mb-3">
+                                    <div class="grid grid-cols-4 gap-2 text-center">
+                                        <div><p class="text-[15px] font-bold tabular-nums text-k-dark" x-text="trip._route.distance_km||'--'"></p><p class="text-[8px] text-k-muted font-bold">KM</p></div>
+                                        <div><p class="text-[15px] font-bold tabular-nums text-k-dark" x-text="trip._route.drive_time_min||'--'"></p><p class="text-[8px] text-k-muted font-bold">MIN</p></div>
+                                        <div><p class="text-[15px] font-bold tabular-nums text-k-dark" x-text="trip._route.avg_speed_kmh||'--'"></p><p class="text-[8px] text-k-muted font-bold">AVG KM/H</p></div>
+                                        <div><p class="text-[15px] font-bold tabular-nums text-k-dark" x-text="trip._route.max_speed_kmh||'--'"></p><p class="text-[8px] text-k-muted font-bold">MAX KM/H</p></div>
+                                    </div>
+                                    <!-- Idle time -->
+                                    <div class="flex items-center justify-between mt-2 pt-2 border-t border-k-border" x-show="trip._route.idle_time_min">
+                                        <span class="text-[10px] text-k-muted font-bold">Idle Time</span>
+                                        <span class="text-[12px] font-bold text-k-dark" x-text="trip._route.idle_time_min + ' min'"></span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Driving Events -->
+                            <template x-if="trip._route && (trip._route.hard_braking_events || trip._route.rapid_acceleration_events || trip._route.excessive_speed_events)">
+                                <div class="flex items-center gap-2 flex-wrap mb-3">
+                                    <template x-if="trip._route.hard_braking_events > 0">
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-k-amberDim text-k-amber">
+                                            <span x-text="trip._route.hard_braking_events"></span> Hard Braking
+                                        </span>
+                                    </template>
+                                    <template x-if="trip._route.rapid_acceleration_events > 0">
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-k-amberDim text-k-amber">
+                                            <span x-text="trip._route.rapid_acceleration_events"></span> Rapid Accel
+                                        </span>
+                                    </template>
+                                    <template x-if="trip._route.excessive_speed_events > 0">
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-k-redDim text-k-red">
+                                            <span x-text="trip._route.excessive_speed_events"></span> Over Speed
+                                        </span>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!-- Google Maps link -->
+                            <a :href="trip._route?.google_maps_url || ('https://www.google.com/maps/dir/?api=1&origin='+(trip.from_gps||'')+'&destination='+(trip.to_gps||''))" target="_blank"
+                               class="flex items-center gap-2 text-[12px] text-k-red font-bold hover:text-k-redHover transition-colors">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                Open in Google Maps
+                            </a>
+                        </div>
+                    </div>
+                </template>
+            </section>
+
+            <!-- Driving Score -->
+            <section x-show="!loading && score" class="mt-4 mb-6 slide-up">
+                <div class="kcard p-4">
+                    <span class="label">Driving Score</span>
+                    <div class="flex items-center gap-4 mt-3">
+                        <div class="text-[32px] font-bold" :class="scoreNum>=80?'text-k-green':scoreNum>=60?'text-k-amber':'text-k-red'" x-text="score?.scores?.overall_score||'--'"></div>
+                        <div class="flex-1 space-y-1.5">
+                            <div class="flex justify-between text-[11px] text-k-muted"><span>Idle</span><span x-text="score?.scores?.idle_ratio||'--'"></span></div>
+                            <div class="flex justify-between text-[11px] text-k-muted"><span>Speed</span><span x-text="score?.scores?.speed_consistency||'--'"></span></div>
+                            <div class="flex justify-between text-[11px] text-k-muted"><span>Max</span><span x-text="score?.scores?.max_speed_check||'--'"></span></div>
+                        </div>
+                    </div>
+                    <div x-show="score?.tips_to_improve?.length" class="mt-3 pt-3 border-t border-k-border">
+                        <template x-for="tip in (score?.tips_to_improve||[])" :key="tip">
+                            <p class="text-[11px] text-k-sub mb-1">* <span x-text="tip"></span></p>
+                        </template>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </template>
+
+    <!-- ====== MONTHLY TAB ====== -->
+    <template x-if="tab==='monthly'">
+        <div>
+            <section class="pt-4 pb-2 slide-up">
+                <div class="flex items-center gap-2">
+                    <button @click="prevMonth()" class="kcard p-2"><svg class="w-5 h-5 text-k-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg></button>
+                    <input type="month" :value="monthFmt" @change="monthDate=new Date($event.target.value+'-15');loadMonthly()" class="flex-1 kcard px-4 py-2.5 text-[14px] font-bold text-center text-k-dark focus:outline-none">
+                    <button @click="nextMonth()" class="kcard p-2"><svg class="w-5 h-5 text-k-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
+                </div>
+            </section>
+            <div x-show="mLoading" class="mt-4"><div class="skel h-24 mb-3"></div><div class="skel h-48"></div></div>
+            <section x-show="!mLoading && mSummary" class="mt-4 slide-up">
+                <div class="kcard p-4">
+                    <span class="label">Monthly Summary</span>
+                    <div class="grid grid-cols-4 gap-3 mt-3 text-center">
+                        <div><p class="text-[18px] font-bold tabular-nums text-k-dark" x-text="mSummary?.distance_km||0"></p><p class="text-[9px] text-k-muted font-bold">KM</p></div>
+                        <div><p class="text-[18px] font-bold tabular-nums text-k-dark" x-text="mSummary?.drive_time_min||0"></p><p class="text-[9px] text-k-muted font-bold">MIN</p></div>
+                        <div><p class="text-[18px] font-bold tabular-nums text-k-dark" x-text="mSummary?.avg_speed_kmh||0"></p><p class="text-[9px] text-k-muted font-bold">AVG</p></div>
+                        <div><p class="text-[18px] font-bold tabular-nums text-k-dark" x-text="mSummary?.max_speed_kmh||0"></p><p class="text-[9px] text-k-muted font-bold">MAX</p></div>
+                    </div>
+                </div>
+            </section>
+            <section x-show="!mLoading && mDays.length>0" class="mt-4 mb-6 slide-up">
+                <div class="kcard divide-y divide-k-border">
+                    <template x-for="d in mDays" :key="d.date">
+                        <button @click="tab='daily'; date=new Date(d.date.slice(0,4)+'-'+d.date.slice(4,6)+'-'+d.date.slice(6,8)+'T12:00:00'); loadDaily()" class="px-4 py-3 flex items-center justify-between hover:bg-k-surface transition-colors w-full text-left">
+                            <span class="text-[13px] text-k-sub" x-text="d.date"></span>
+                            <span class="text-[13px] font-bold text-k-dark" x-text="d.trip_count+' trip'+(d.trip_count>1?'s':'')"></span>
+                        </button>
+                    </template>
+                </div>
+            </section>
+        </div>
+    </template>
+
+    <!-- ====== INSIGHTS TAB ====== -->
+    <template x-if="tab==='insights'">
+        <div>
+            <div x-show="iLoading" class="mt-6"><div class="skel h-36 mb-3"></div><div class="skel h-48 mb-3"></div><div class="skel h-48"></div></div>
+            <section x-show="!iLoading && drivingSummary" class="mt-5 slide-up">
+                <div class="kcard p-4">
+                    <span class="label">This Month</span>
+                    <div class="grid grid-cols-3 gap-3 mt-3 text-center">
+                        <div><p class="text-[18px] font-bold text-k-dark" x-text="drivingSummary?.total_distance_km||0"></p><p class="text-[9px] text-k-muted font-bold">TOTAL KM</p></div>
+                        <div><p class="text-[18px] font-bold text-k-dark" x-text="drivingSummary?.total_trips||0"></p><p class="text-[9px] text-k-muted font-bold">TRIPS</p></div>
+                        <div><p class="text-[18px] font-bold text-k-dark" x-text="drivingSummary?.days_driven||0"></p><p class="text-[9px] text-k-muted font-bold">DAYS</p></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 mt-3 text-center">
+                        <div><p class="text-[18px] font-bold text-k-dark" x-text="drivingSummary?.avg_daily_km||0"></p><p class="text-[9px] text-k-muted font-bold">KM/DAY</p></div>
+                        <div><p class="text-[18px] font-bold text-k-dark" x-text="drivingSummary?.car_avg_mileage_kmpl||'--'"></p><p class="text-[9px] text-k-muted font-bold">KM/L</p></div>
+                        <div><p class="text-[18px] font-bold" :class="safetyNum>=80?'text-k-green':safetyNum>=60?'text-k-amber':'text-k-red'" x-text="drivingSummary?.safety?.score||'--'"></p><p class="text-[9px] text-k-muted font-bold">SAFETY</p></div>
+                    </div>
+                </div>
+            </section>
+            <section x-show="!iLoading && drivingSummary?.safety" class="mt-4 slide-up" style="animation-delay:0.05s">
+                <div class="kcard p-4">
+                    <span class="label">Safety Events</span>
+                    <div class="grid grid-cols-3 gap-3 mt-3 text-center">
+                        <div><p class="text-[18px] font-bold text-k-amber" x-text="drivingSummary?.safety?.hard_braking_events||0"></p><p class="text-[9px] text-k-muted font-bold">HARD BRAKE</p></div>
+                        <div><p class="text-[18px] font-bold text-k-amber" x-text="drivingSummary?.safety?.rapid_acceleration_events||0"></p><p class="text-[9px] text-k-muted font-bold">RAPID ACCEL</p></div>
+                        <div><p class="text-[18px] font-bold text-k-red" x-text="drivingSummary?.safety?.excessive_speed_events||0"></p><p class="text-[9px] text-k-muted font-bold">OVER SPEED</p></div>
+                    </div>
+                </div>
+            </section>
+            <section x-show="!iLoading && departures" class="mt-4 slide-up" style="animation-delay:0.1s">
+                <div class="kcard p-4">
+                    <span class="label">Departure Patterns</span>
+                    <div class="grid grid-cols-3 gap-3 mt-3 text-center">
+                        <div><p class="text-[16px] font-bold text-k-dark" x-text="departures?.peak_hour||'--'"></p><p class="text-[9px] text-k-muted font-bold">PEAK HOUR</p></div>
+                        <div><p class="text-[16px] font-bold text-k-dark" x-text="departures?.earliest_ever||'--'"></p><p class="text-[9px] text-k-muted font-bold">EARLIEST</p></div>
+                        <div><p class="text-[16px] font-bold text-k-dark" x-text="departures?.latest_ever||'--'"></p><p class="text-[9px] text-k-muted font-bold">LATEST</p></div>
+                    </div>
+                    <div x-show="departures?.departures_by_hour" class="mt-4">
+                        <div class="flex items-end gap-1 h-16">
+                            <template x-for="h in Array.from({length:24},(_,i)=>i)" :key="h">
+                                <div class="flex-1 rounded-t" :style="'height:'+Math.max(2,(departures?.departures_by_hour?.[String(h).padStart(2,'0')+':00']||0)/(maxDepartures||1)*100)+'%;background:'+(h>=6&&h<=10?'#00884d':h>=17&&h<=21?'#f59000':'#e8e8e8')"></div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section x-show="!iLoading && freqLocs.length>0" class="mt-4 mb-6 slide-up" style="animation-delay:0.15s">
+                <div class="kcard overflow-hidden">
+                    <div id="freq-map" style="height:200px;z-index:1;border-radius:12px 12px 0 0;"></div>
+                    <div class="p-4">
+                        <span class="label">Frequent Locations</span>
+                        <div class="mt-3 space-y-2">
+                            <template x-for="(loc,i) in freqLocs.slice(0,5)" :key="i">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-[12px] text-k-sub flex-1 mr-3 truncate" x-text="loc.address||loc.maps_link"></p>
+                                    <span class="text-[12px] font-bold text-k-dark" x-text="loc.visit_count+'x'"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function tripsApp() {
+    return {
+        tab:'daily', loading:true, trips:[], summary:null, score:null, scoreNum:0, tripMaps:{}, fuelCostStr:'--',
+        date:new Date(), monthDate:new Date(),
+        mLoading:false, mSummary:null, mDays:[],
+        iLoading:false, drivingSummary:null, departures:null, freqLocs:[], safetyNum:0, maxDepartures:1, freqMap:null,
+
+        get dateStr() { return this.date.toISOString().slice(0,10).replace(/-/g,''); },
+        get dateFmt() { return this.date.toISOString().slice(0,10); },
+        get isToday() { return this.dateStr===new Date().toISOString().slice(0,10).replace(/-/g,''); },
+        get monthStr() { const d=this.monthDate; return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0'); },
+        get monthFmt() { const d=this.monthDate; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); },
+
+        async init() { await this.loadDaily(); },
+        prevDay() { this.date=new Date(this.date.getTime()-86400000); this.loadDaily(); },
+        nextDay() { if(!this.isToday){this.date=new Date(this.date.getTime()+86400000); this.loadDaily();} },
+        setDate(v) { this.date=new Date(v+'T12:00:00'); this.loadDaily(); },
+        setToday() { this.date=new Date(); this.loadDaily(); },
+        prevMonth() { this.monthDate=new Date(this.monthDate.getFullYear(),this.monthDate.getMonth()-1,15); this.loadMonthly(); },
+        nextMonth() { this.monthDate=new Date(this.monthDate.getFullYear(),this.monthDate.getMonth()+1,15); this.loadMonthly(); },
+
+        async loadDaily() {
+            this.loading=true; this.trips=[]; this.summary=null; this.score=null; this.fuelCostStr='--';
+            Object.values(this.tripMaps).forEach(m=>m.remove()); this.tripMaps={};
+            try {
+                const [det,sc,fc]=await Promise.allSettled([
+                    apiGet('trip-details/'+this.dateStr), apiGet('driving-score/'+this.dateStr), apiGet('fuel-cost/'+this.dateStr),
+                ]);
+                if(det.status==='fulfilled'&&!det.value.error){ this.summary=det.value.summary; this.trips=(det.value.trips||[]).map(t=>({...t,_route:null,_routeLoading:false})); }
+                if(sc.status==='fulfilled'&&!sc.value.error&&sc.value.scores){ this.score=sc.value; this.scoreNum=parseInt(this.score.scores?.overall_score||'0'); }
+                if(fc.status==='fulfilled'&&!fc.value.error&&fc.value.estimated_cost_inr!=null){ this.fuelCostStr='₹'+Math.round(fc.value.estimated_cost_inr); }
+            } catch(e){}
+            this.loading=false;
+        },
+
+        async loadAndDrawRoute(i, trip) {
+            const el = document.getElementById('trip-map-'+i);
+            if (!el || this.tripMaps[i]) return;
+
+            const fg = trip.from_gps?.split(',').map(Number);
+            const tg = trip.to_gps?.split(',').map(Number);
+            if (!fg || !tg || fg.length!==2 || tg.length!==2 || isNaN(fg[0]) || isNaN(tg[0])) return;
+
+            const map = L.map(el, {zoomControl:false, attributionControl:false});
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19}).addTo(map);
+            this.tripMaps[i] = map;
+
+            const startIcon = L.divIcon({html:'<div style="width:14px;height:14px;background:#00884d;border-radius:50%;border:3px solid #fff;box-shadow:0 0 8px rgba(0,136,77,0.4)"></div>',className:'',iconSize:[14,14],iconAnchor:[7,7]});
+            const endIcon = L.divIcon({html:'<div style="width:14px;height:14px;background:#bb162b;border-radius:50%;border:3px solid #fff;box-shadow:0 0 8px rgba(187,22,43,0.4)"></div>',className:'',iconSize:[14,14],iconAnchor:[7,7]});
+
+            L.marker(fg, {icon:startIcon}).addTo(map);
+            L.marker(tg, {icon:endIcon}).addTo(map);
+
+            // Start with dashed line, then load full route
+            const tempLine = L.polyline([fg, tg], {color:'#bb162b', weight:2, opacity:0.3, dashArray:'6,6'}).addTo(map);
+            map.fitBounds([fg, tg], {padding:[40,40]});
+
+            // Load full route with waypoints
+            try {
+                const route = await apiGet('trip-route/'+this.dateStr+'/'+i);
+                if (!route.error && route.waypoints && route.waypoints.length > 1) {
+                    this.trips[i]._route = route;
+
+                    map.removeLayer(tempLine);
+                    const latlngs = route.waypoints.map(w => [w.lat, w.lon]);
+                    L.polyline(latlngs, {color:'#bb162b', weight:3, opacity:0.8, smoothFactor:1}).addTo(map);
+
+                    // Add stop markers
+                    if (route.stops) {
+                        const stopIcon = L.divIcon({html:'<div style="width:10px;height:10px;background:#f59000;border-radius:50%;border:2px solid #fff;box-shadow:0 0 6px rgba(245,144,0,0.4)"></div>',className:'',iconSize:[10,10],iconAnchor:[5,5]});
+                        route.stops.forEach(s => L.marker([s.lat, s.lon], {icon:stopIcon}).addTo(map));
+                    }
+
+                    map.fitBounds(latlngs, {padding:[40,40]});
+                } else if (!route.error) {
+                    this.trips[i]._route = route;
+                }
+            } catch(e) {}
+        },
+
+        async loadMonthly() {
+            this.mLoading=true; this.mSummary=null; this.mDays=[];
+            try { const d=await apiGet('trips/month/'+this.monthStr); if(!d.error){this.mSummary=d.summary; this.mDays=d.days||[];} } catch(e){}
+            this.mLoading=false;
+        },
+        async loadInsights() {
+            this.iLoading=true;
+            try {
+                const [ds,dp,fl]=await Promise.allSettled([apiGet('driving-summary'),apiGet('departure-patterns'),apiGet('frequent-places')]);
+                if(ds.status==='fulfilled'&&!ds.value.error){this.drivingSummary=ds.value;this.safetyNum=parseInt(ds.value.safety?.score||'0');}
+                if(dp.status==='fulfilled'&&!dp.value.error){this.departures=dp.value;this.maxDepartures=Math.max(...Object.values(dp.value.departures_by_hour||{}),1);}
+                if(fl.status==='fulfilled'&&!fl.value.error){this.freqLocs=fl.value.top_locations||[];this.$nextTick(()=>this.initFreqMap());}
+            } catch(e){}
+            this.iLoading=false;
+        },
+        initFreqMap() {
+            if(this.freqMap||!this.freqLocs.length) return;
+            const el=document.getElementById('freq-map'); if(!el) return;
+            this.freqMap=L.map(el,{zoomControl:false,attributionControl:false});
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(this.freqMap);
+            const bounds=[];
+            this.freqLocs.forEach(loc=>{
+                if(!loc.latitude||!loc.longitude) return;
+                const ll=[loc.latitude,loc.longitude]; bounds.push(ll);
+                const icon=L.divIcon({html:`<div style="width:${12+loc.visit_count*2}px;height:${12+loc.visit_count*2}px;background:rgba(187,22,43,${0.3+loc.visit_count*0.1});border-radius:50%;border:2px solid #bb162b;display:flex;align-items:center;justify-content:center"><span style="font-size:9px;font-weight:700;color:#bb162b">${loc.visit_count}</span></div>`,className:'',iconSize:[12+loc.visit_count*2,12+loc.visit_count*2],iconAnchor:[(12+loc.visit_count*2)/2,(12+loc.visit_count*2)/2]});
+                L.marker(ll,{icon}).addTo(this.freqMap);
+            });
+            if(bounds.length) this.freqMap.fitBounds(bounds,{padding:[30,30]});
+        },
+    };
+}
+</script>
+{% endblock %}

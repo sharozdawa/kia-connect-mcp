@@ -1,0 +1,52 @@
+[project]
+name = "kia-connect-mcp"
+version = "0.1.0"
+description = "MCP server, CLI, and PWA for controlling Kia / Hyundai / Genesis vehicles"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Sharoz Dawa", email = "sharozdawa@gmail.com" },
+]
+keywords = ["mcp", "kia", "hyundai", "genesis", "connected-car", "claude", "anthropic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Home Automation",
+]
+dependencies = [
+    "hyundai-kia-connect-api @ git+https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api.git",
+    "mcp[cli]>=1.0.0",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "jinja2>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/sharozdawa/kia-connect-mcp"
+Repository = "https://github.com/sharozdawa/kia-connect-mcp"
+Issues = "https://github.com/sharozdawa/kia-connect-mcp/issues"
+
+[project.scripts]
+kia-mcp = "kia_mcp.server:main"
+kia-connect = "kia_mcp.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["kia_mcp"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

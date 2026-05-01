@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}Kia Connect — Car{% endblock %}
+
+{% block content %}
+<div x-data="carApp()" x-init="init()">
+
+    <div x-show="loading" class="mt-6 space-y-3"><div class="skel h-28"></div><div class="skel h-48"></div><div class="skel h-36"></div></div>
+
+    <!-- Vehicle Identity -->
+    <section x-show="!loading" class="pt-5 slide-up" style="animation-delay:0.05s">
+        <div class="kcard p-6 text-center">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-k-redDim flex items-center justify-center">
+                <svg width="28" height="14" viewBox="0 0 68 34" fill="#bb162b"><path d="M39.4,23.11c0,0.12,0.04,0.2,0.11,0.2c0.05,0,0.1-0.02,0.16-0.06L60.65,9.62c0.37-0.24,0.71-0.37,1.21-0.37h4.61c0.71,0,1.18,0.47,1.18,1.18v8.8c0,1.06-0.24,1.68-1.18,2.25l-5.59,3.36c-0.07,0.05-0.13,0.07-0.19,0.07c-0.07,0-0.13-0.05-0.13-0.24l0-10.28c0-0.11-0.04-0.2-0.11-0.2c-0.05,0-0.1,0.02-0.16,0.06l-15.34,9.96c-0.43,0.28-0.78,0.36-1.18,0.36H33.61c-0.71,0-1.18-0.47-1.18-1.18V10.71c0-0.09-0.04-0.18-0.11-0.18c-0.05,0-0.1,0.02-0.16,0.06l-10.11,6.08c-0.1,0.06-0.13,0.11-0.13,0.16c0,0.04,0.02,0.08,0.09,0.16l7.22,7.22c0.1,0.1,0.16,0.17,0.16,0.25c0,0.09-0.11,0.12-0.23,0.12l-6.54,0c-0.51,0-0.91-0.08-1.18-0.35l-4.38-4.38c-0.04-0.04-0.08-0.07-0.13-0.07c-0.04,0-0.09,0.02-0.14,0.05l-7.33,4.4c-0.44,0.27-0.75,0.35-1.18,0.35H1.53c-0.71,0-1.18-0.47-1.18-1.18v-8.64c0-1.06,0.24-1.67,1.18-2.24l5.63-3.38C7.21,9.1,7.26,9.09,7.31,9.09c0.09,0,0.13,0.09,0.13,0.28v11.55c0,0.12,0.03,0.18,0.11,0.18c0.05,0,0.1-0.03,0.17-0.07L26.73,9.61c0.45-0.27,0.73-0.35,1.25-0.35h10.23c0.71,0,1.18,0.47,1.18,1.18V23.11z"/></svg>
+            </div>
+            <!-- Editable name -->
+            <div x-show="!renaming" @dblclick="renaming=true;renameName=info.name||''" class="cursor-pointer">
+                <h2 class="text-[22px] font-bold text-k-dark" x-text="info.name||info.model||'Vehicle'"></h2>
+                <p class="text-[10px] text-k-light mt-0.5">Double-tap to rename</p>
+            </div>
+            <div x-show="renaming" class="flex items-center gap-2 justify-center mt-1">
+                <input x-model="renameName" class="border border-k-border rounded-lg px-3 py-1.5 text-[14px] font-bold text-center w-48 bg-white focus:outline-none" @keydown.enter="doRename()" @keydown.escape="renaming=false">
+                <button @click="doRename()" class="btn-red px-3 py-1.5 text-[12px]">Save</button>
+                <button @click="renaming=false" class="btn-outline px-3 py-1.5 text-[12px]">Cancel</button>
+            </div>
+            <p class="text-[14px] text-k-sub mt-1" x-text="(profile.model||'')+' '+(profile.model_year||'')"></p>
+            <p class="text-[12px] text-k-muted mt-1">VIN: <span x-text="info.vin||'--'"></span></p>
+            <div class="flex items-center justify-center gap-3 mt-3">
+                <span class="text-[11px] font-bold px-3 py-1 rounded-full border border-k-border text-k-sub" x-text="profile.transmission||'--'"></span>
+                <span class="text-[11px] font-bold px-3 py-1 rounded-full border border-k-border text-k-sub" x-text="info.engine_type||'--'"></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Stats -->
+    <section x-show="!loading" class="mt-4 grid grid-cols-3 gap-2.5 slide-up" style="animation-delay:0.1s">
+        <div class="kcard p-3 text-center"><p class="text-[18px] font-bold tabular-nums text-k-dark" x-text="odometer">--</p><p class="text-[10px] text-k-muted font-bold tracking-wider">KM</p></div>
+        <div class="kcard p-3 text-center"><p class="text-[18px] font-bold tabular-nums text-k-dark" x-text="fuel+'%'">--</p><p class="text-[10px] text-k-muted font-bold tracking-wider">FUEL</p></div>
+        <div class="kcard p-3 text-center"><p class="text-[18px] font-bold tabular-nums text-k-dark" x-text="battery+'%'">--</p><p class="text-[10px] text-k-muted font-bold tracking-wider">12V</p></div>
+    </section>
+
+    <!-- Health (with windows + lights) -->
+    <section x-show="!loading" class="mt-5 slide-up" style="animation-delay:0.15s">
+        <p class="label mb-3 px-0.5">Health Status</p>
+        <div class="kcard divide-y divide-k-border">
+            <template x-for="item in healthItems" :key="item.label">
+                <div class="px-4 py-3 flex items-center justify-between">
+                    <span class="text-[13px] text-k-sub" x-text="item.label"></span>
+                    <span class="text-[13px] font-bold" :class="item.ok?'text-k-green':'text-k-amber'" x-text="item.value"></span>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <!-- Warnings -->
+    <section x-show="!loading && warningItems.length>0" class="mt-5 slide-up" style="animation-delay:0.2s">
+        <p class="label mb-3 px-0.5">Warnings</p>
+        <div class="space-y-2">
+            <template x-for="w in warningItems" :key="w.label">
+                <div class="kcard p-3 flex items-center gap-3 border-k-amber/20">
+                    <div class="w-8 h-8 rounded-lg bg-k-amberDim flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-k-amber" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
+                    <p class="text-[13px] text-k-amber font-bold" x-text="w.label"></p>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <!-- Maintenance -->
+    <section x-show="!loading" class="mt-5 slide-up" style="animation-delay:0.25s">
+        <p class="label mb-3 px-0.5">Maintenance</p>
+        <div class="kcard divide-y divide-k-border">
+            <template x-for="svc in services" :key="svc.item">
+                <div class="px-4 py-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[13px] font-bold text-k-dark" x-text="svc.item"></span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="svc.urgency==='overdue'?'bg-k-redDim text-k-red':svc.urgency==='soon'?'bg-k-amberDim text-k-amber':'bg-k-greenDim text-k-green'" x-text="svc.urgency"></span>
+                            <button @click="editMaint(svc)" class="text-k-muted hover:text-k-dark"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-k-muted">
+                        <span x-text="svc.km_remaining+' km left'"></span>
+                        <span x-text="svc.estimated_days_remaining?'~'+svc.estimated_days_remaining+' days':''"></span>
+                    </div>
+                    <div class="bar-track mt-2"><div class="bar-fill" :class="svc.urgency==='overdue'?'bg-k-red':svc.urgency==='soon'?'bg-k-amber':'bg-k-green'" :style="'width:'+Math.max(5,Math.min(100,(1-svc.km_remaining/svc.interval_km)*100))+'%'"></div></div>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <!-- Alerts (editable) -->
+    <section x-show="!loading" class="mt-5 slide-up" style="animation-delay:0.3s">
+        <p class="label mb-3 px-0.5">Alerts</p>
+        <div class="kcard divide-y divide-k-border">
+            <!-- Speed -->
+            <div class="px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[13px] text-k-sub">Speed Alert</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[13px] font-bold" :class="alerts.speed_alert_enabled?'text-k-green':'text-k-light'" x-text="alerts.speed_alert_enabled?alerts.speed_alert_kmh+' km/h':'Off'"></span>
+                        <button @click="editAlert='speed';alertVal=alerts.speed_alert_kmh||80" class="text-k-muted hover:text-k-dark"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                    </div>
+                </div>
+                <div x-show="editAlert==='speed'" class="mt-2 flex items-center gap-2">
+                    <input x-model.number="alertVal" type="number" class="border border-k-border rounded-lg px-3 py-1.5 text-[13px] w-20 bg-white focus:outline-none" placeholder="km/h">
+                    <button @click="setAlert('alerts/speed',{speed_kmh:alertVal},'Speed alert set');editAlert=''" class="btn-red px-3 py-1.5 text-[12px]">Set</button>
+                    <button @click="setAlert('alerts/speed',{speed_kmh:0},'Speed alert disabled');editAlert=''" class="btn-outline px-3 py-1.5 text-[12px]">Off</button>
+                </div>
+            </div>
+            <!-- Idle -->
+            <div class="px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[13px] text-k-sub">Idle Alert</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[13px] font-bold" :class="alerts.idle_alert_enabled?'text-k-green':'text-k-light'" x-text="alerts.idle_alert_enabled?alerts.idle_alert_minutes+' min':'Off'"></span>
+                        <button @click="editAlert='idle';alertVal=alerts.idle_alert_minutes||10" class="text-k-muted hover:text-k-dark"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                    </div>
+                </div>
+                <div x-show="editAlert==='idle'" class="mt-2 flex items-center gap-2">
+                    <input x-model.number="alertVal" type="number" class="border border-k-border rounded-lg px-3 py-1.5 text-[13px] w-20 bg-white focus:outline-none" placeholder="min">
+                    <button @click="setAlert('alerts/idle',{minutes:alertVal},'Idle alert set');editAlert=''" class="btn-red px-3 py-1.5 text-[12px]">Set</button>
+                    <button @click="setAlert('alerts/idle',{minutes:0},'Idle alert disabled');editAlert=''" class="btn-outline px-3 py-1.5 text-[12px]">Off</button>
+                </div>
+            </div>
+            <!-- Valet -->
+            <div class="px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[13px] text-k-sub">Valet Alert</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[13px] font-bold" :class="alerts.valet_alert_enabled?'text-k-green':'text-k-light'" x-text="alerts.valet_alert_enabled?'On':'Off'"></span>
+                        <button @click="editAlert='valet';valetSpeed=alerts.valet_speed_limit||80;valetIdle=alerts.valet_idle_limit||10" class="text-k-muted hover:text-k-dark"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                    </div>
+                </div>
+                <div x-show="editAlert==='valet'" class="mt-2 flex items-center gap-2">
+                    <input x-model.number="valetSpeed" type="number" class="border border-k-border rounded-lg px-3 py-1.5 text-[13px] w-16 bg-white focus:outline-none" placeholder="km/h">
+                    <input x-model.number="valetIdle" type="number" class="border border-k-border rounded-lg px-3 py-1.5 text-[13px] w-16 bg-white focus:outline-none" placeholder="min">
+                    <button @click="setAlert('alerts/valet',{speed_limit:valetSpeed,idle_limit:valetIdle},'Valet alert set');editAlert=''" class="btn-red px-3 py-1.5 text-[12px]">Set</button>
+                    <button @click="setAlert('alerts/valet',{speed_limit:0},'Valet alert off');editAlert=''" class="btn-outline px-3 py-1.5 text-[12px]">Off</button>
+                </div>
+            </div>
+            <!-- Curfew -->
+            <div class="px-4 py-3 flex items-center justify-between">
+                <span class="text-[13px] text-k-sub">Curfew Alert</span>
+                <div class="flex items-center gap-2">
+                    <button @click="setAlert('alerts/curfew',{enabled:true},'Curfew enabled')" class="text-[12px] font-bold text-k-green hover:underline">On</button>
+                    <span class="text-k-light">|</span>
+                    <button @click="setAlert('alerts/curfew',{enabled:false},'Curfew disabled')" class="text-[12px] font-bold text-k-red hover:underline">Off</button>
+                </div>
+            </div>
+            <!-- Geofence -->
+            <div class="px-4 py-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[13px] text-k-sub">Geofence Alert</span>
+                    <button @click="editAlert=editAlert==='geo'?'':'geo'" class="text-k-muted hover:text-k-dark"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                </div>
+                <div x-show="editAlert==='geo'" class="mt-2">
+                    <div class="grid grid-cols-3 gap-2 mb-2">
+                        <input x-model.number="geoLat" type="number" step="any" placeholder="Lat" class="border border-k-border rounded-lg px-2 py-1.5 text-[12px] bg-white focus:outline-none">
+                        <input x-model.number="geoLon" type="number" step="any" placeholder="Lon" class="border border-k-border rounded-lg px-2 py-1.5 text-[12px] bg-white focus:outline-none">
+                        <input x-model.number="geoRadius" type="number" placeholder="Radius (m)" class="border border-k-border rounded-lg px-2 py-1.5 text-[12px] bg-white focus:outline-none">
+                    </div>
+                    <button @click="setAlert('alerts/geofence',{latitude:geoLat,longitude:geoLon,radius_meters:geoRadius},'Geofence set');editAlert=''" class="btn-red px-3 py-1.5 text-[12px] w-full">Set Geofence</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Profile -->
+    <section x-show="!loading" class="mt-5 slide-up" style="animation-delay:0.35s">
+        <p class="label mb-3 px-0.5">Profile</p>
+        <div class="kcard divide-y divide-k-border">
+            <template x-for="item in profileItems" :key="item.label">
+                <div class="px-4 py-3 flex items-center justify-between">
+                    <span class="text-[13px] text-k-muted" x-text="item.label"></span>
+                    <span class="text-[13px] font-bold text-k-dark" x-text="item.value"></span>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section x-show="!loading && features.length>0" class="mt-5 slide-up" style="animation-delay:0.4s">
+        <p class="label mb-3 px-0.5">Features</p>
+        <div class="kcard p-4"><div class="flex flex-wrap gap-2">
+            <template x-for="f in features" :key="f">
+                <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-k-greenDim text-k-green border border-k-green/15" x-text="f"></span>
+            </template>
+        </div></div>
+    </section>
+
+    <!-- Rate Limit -->
+    <section x-show="!loading" class="mt-5 mb-6 slide-up" style="animation-delay:0.45s">
+        <p class="label mb-3 px-0.5">API Rate Limit</p>
+        <div class="kcard p-4 flex items-center justify-between">
+            <span class="text-[13px] text-k-sub">Remaining Calls</span>
+            <span class="text-[14px] font-bold text-k-dark" x-text="rateLimit.remaining+' / '+rateLimit.limit"></span>
+        </div>
+    </section>
+
+    <!-- Maintenance Edit Modal -->
+    <template x-if="maintModal">
+        <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6" @click.self="maintModal=false">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl slide-up">
+                <h3 class="text-[16px] font-bold text-k-dark mb-4" x-text="'Edit: '+maintItem"></h3>
+                <div class="space-y-3 mb-4">
+                    <div class="flex items-center justify-between"><span class="text-[13px] text-k-sub">Interval (km)</span><input x-model.number="maintKm" type="number" class="border border-k-border rounded-lg px-3 py-1.5 text-[13px] w-24 bg-white focus:outline-none text-right"></div>
+                    <div class="flex items-center justify-between"><span class="text-[13px] text-k-sub">Interval (months)</span><input x-model.number="maintMonths" type="number" class="border border-k-border rounded-lg px-3 py-1.5 text-[13px] w-24 bg-white focus:outline-none text-right"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button @click="maintModal=false" class="btn-outline py-2.5 text-[14px]">Cancel</button>
+                    <button @click="saveMaint()" class="btn-red py-2.5 text-[14px]">Save</button>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function carApp() {
+    return {
+        loading:true, info:{}, profile:{}, odometer:'--', fuel:0, battery:0,
+        healthItems:[], warningItems:[], services:[], profileItems:[], features:[], alerts:{},
+        rateLimit:{remaining:0,limit:0},
+        renaming:false, renameName:'',
+        editAlert:'', alertVal:0, valetSpeed:80, valetIdle:10, geoLat:0, geoLon:0, geoRadius:1000,
+        maintModal:false, maintItem:'', maintKm:10000, maintMonths:12,
+
+        async init() {
+            try {
+                const [infoR,profileR,odometerR,fuelR,batteryR,healthR,warningsR,serviceR,alertsR,winR,lightsR,rateR] = await Promise.allSettled([
+                    apiGet('info'),apiGet('profile'),apiGet('odometer'),apiGet('fuel'),apiGet('battery'),
+                    apiGet('health'),apiGet('warnings'),apiGet('next-service'),apiGet('alerts'),
+                    apiGet('windows'),apiGet('lights'),apiGet('rate-limit'),
+                ]);
+                if(infoR.status==='fulfilled') this.info=infoR.value;
+                if(profileR.status==='fulfilled') this.profile=profileR.value;
+                if(odometerR.status==='fulfilled') this.odometer=Math.round(odometerR.value.odometer_km||0).toLocaleString();
+                if(fuelR.status==='fulfilled') this.fuel=fuelR.value.fuel_level_percent||0;
+                if(batteryR.status==='fulfilled') this.battery=batteryR.value.battery_12v_percent||0;
+
+                const h=healthR.status==='fulfilled'?healthR.value:{};
+                const w=winR.status==='fulfilled'?winR.value:{};
+                const l=lightsR.status==='fulfilled'?lightsR.value:{};
+                this.healthItems=[
+                    {label:'Parking Brake',value:h.parking_brake_engaged?'Engaged':'Released',ok:true},
+                    {label:'Hazard Lights',value:h.hazard_lights_on?'On':'Off',ok:!h.hazard_lights_on},
+                    {label:'Air Purifier',value:h.air_purifier_on?'On':'Off',ok:true},
+                    {label:'12V Battery',value:h.battery_12v_state||'Normal',ok:!h.battery_12v_warning},
+                    {label:'Engine Oil',value:h.engine_oil_warning?'Warning':'Normal',ok:!h.engine_oil_warning},
+                    {label:'Front Left Window',value:w.front_left_open?'Open':'Closed',ok:!w.front_left_open},
+                    {label:'Front Right Window',value:w.front_right_open?'Open':'Closed',ok:!w.front_right_open},
+                    {label:'Back Left Window',value:w.back_left_open?'Open':'Closed',ok:!w.back_left_open},
+                    {label:'Back Right Window',value:w.back_right_open?'Open':'Closed',ok:!w.back_right_open},
+                    {label:'Headlamps',value:l.headlamp_on?'On':'Off',ok:true},
+                    {label:'Stop Lamps',value:(l.left_stop_lamp&&l.right_stop_lamp)?'Both OK':(!l.left_stop_lamp&&!l.right_stop_lamp)?'Both Off':'Check!',ok:l.left_stop_lamp===l.right_stop_lamp},
+                ];
+
+                if(warningsR.status==='fulfilled'){
+                    const wn=warningsR.value; this.warningItems=[];
+                    if(wn.washer_fluid_low) this.warningItems.push({label:'Washer fluid low'});
+                    if(wn.brake_fluid_low) this.warningItems.push({label:'Brake fluid low'});
+                    if(wn.smart_key_battery_low) this.warningItems.push({label:'Smart key battery low'});
+                }
+                if(serviceR.status==='fulfilled'&&serviceR.value.services) this.services=serviceR.value.services.slice(0,9);
+                if(alertsR.status==='fulfilled') this.alerts=alertsR.value;
+                if(rateR.status==='fulfilled'&&!rateR.value.error) this.rateLimit=rateR.value;
+
+                if(this.profile){
+                    this.profileItems=[
+                        {label:'Exterior',value:this.profile.exterior_color||'--'},
+                        {label:'Interior',value:this.profile.interior_color||'--'},
+                        {label:'Head Unit',value:this.profile.head_unit||'--'},
+                        {label:'SIM Status',value:this.profile.sim_active?'Active':'Inactive'},
+                        {label:'Registration',value:this.info.registration_date||'--'},
+                    ];
+                    const feats=this.profile.features||{};
+                    this.features=Object.entries(feats).filter(([k,v])=>v&&typeof v==='boolean').map(([k])=>k.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase()));
+                }
+            } catch(e){}
+            this.loading=false;
+        },
+
+        async doRename() {
+            if(!this.renameName) return;
+            await apiPost('rename',{name:this.renameName},'Renaming...');
+            this.info.name=this.renameName; this.renaming=false;
+        },
+
+        async setAlert(ep,body,msg) { await apiPost(ep,body,msg); try{this.alerts=await apiGet('alerts');}catch(e){} },
+
+        editMaint(svc) { this.maintItem=svc.item; this.maintKm=svc.interval_km; this.maintMonths=12; this.maintModal=true; },
+        async saveMaint() {
+            await apiPost('maintenance/update',{item_name:this.maintItem,interval_km:this.maintKm,interval_months:this.maintMonths},'Updating '+this.maintItem+'...');
+            this.maintModal=false;
+            try{ const s=await apiGet('next-service'); if(s.services) this.services=s.services.slice(0,9); }catch(e){}
+        },
+    };
+}
+</script>
+{% endblock %}

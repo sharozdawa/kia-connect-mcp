@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="color-scheme" content="light">
+    <link rel="manifest" href="/manifest.json">
+    <title>{% block title %}Kia Connect{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        k: {
+                            bg: '#ffffff',
+                            surface: '#f6f2ed',
+                            card: '#ffffff',
+                            hover: '#f9f9f9',
+                            border: '#e8e8e8',
+                            borderDark: '#d9d9d9',
+                            dark: '#05141f',
+                            darkPanel: '#071c24',
+                            red: '#bb162b',
+                            redHover: '#a01224',
+                            redDim: 'rgba(187,22,43,0.08)',
+                            green: '#00884d',
+                            greenBright: '#00b066',
+                            greenDim: 'rgba(0,136,77,0.08)',
+                            amber: '#f59000',
+                            amberDim: 'rgba(245,144,0,0.08)',
+                            blue: '#01a59a',
+                            blueDim: 'rgba(1,165,154,0.08)',
+                            text: '#05141f',
+                            sub: '#313131',
+                            muted: '#959191',
+                            light: '#b8b8b8',
+                        }
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        html { color-scheme: light only; }
+        body { background: #f6f2ed; color: #05141f; -webkit-font-smoothing: antialiased; }
+        ::-webkit-scrollbar { width: 0; }
+
+        .kcard { background: #ffffff; border: 1px solid #e8e8e8; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .kcard-hover:hover { border-color: #d9d9d9; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+        .nav-tab { position: relative; color: #959191; transition: color 0.2s; padding: 14px 0 12px; }
+        .nav-tab.active { color: #05141f; }
+        .nav-tab.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 2px; background: #bb162b; border-radius: 1px; }
+
+        .bar-track { height: 4px; background: #e8e8e8; border-radius: 2px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 2px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        .btn-red { background: #bb162b; color: #fff; font-weight: 700; border-radius: 10px; transition: all 0.15s; letter-spacing: 0.02em; }
+        .btn-red:hover { background: #a01224; }
+        .btn-red:active { transform: scale(0.97); }
+        .btn-outline { background: transparent; border: 1px solid #d9d9d9; color: #05141f; font-weight: 700; border-radius: 10px; transition: all 0.15s; }
+        .btn-outline:hover { border-color: #b8b8b8; background: #f6f2ed; }
+        .btn-outline:active { transform: scale(0.97); }
+
+        .leaflet-container { background: #f6f2ed !important; }
+        .leaflet-control-zoom { border: 1px solid #e8e8e8 !important; border-radius: 8px !important; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important; }
+        .leaflet-control-zoom a { background: #fff !important; color: #313131 !important; border-color: #e8e8e8 !important; width: 32px !important; height: 32px !important; line-height: 32px !important; font-size: 16px !important; }
+        .leaflet-control-zoom a:hover { background: #f6f2ed !important; }
+        .leaflet-control-attribution { display: none !important; }
+
+        .skel { background: linear-gradient(90deg, #f0ece7 25%, #e8e4df 50%, #f0ece7 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        .label { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #959191; }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header — dark like kia.com -->
+    <header class="sticky top-0 z-50 bg-[#05141f]">
+        <div class="max-w-lg mx-auto px-5 py-3.5 flex items-center justify-between">
+            <svg viewBox="0 0 68 34" width="56" height="28" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+                <path d="M39.4,23.11c0,0.12,0.04,0.2,0.11,0.2c0.05,0,0.1-0.02,0.16-0.06L60.65,9.62c0.37-0.24,0.71-0.37,1.21-0.37h4.61c0.71,0,1.18,0.47,1.18,1.18v8.8c0,1.06-0.24,1.68-1.18,2.25l-5.59,3.36c-0.07,0.05-0.13,0.07-0.19,0.07c-0.07,0-0.13-0.05-0.13-0.24l0-10.28c0-0.11-0.04-0.2-0.11-0.2c-0.05,0-0.1,0.02-0.16,0.06l-15.34,9.96c-0.43,0.28-0.78,0.36-1.18,0.36H33.61c-0.71,0-1.18-0.47-1.18-1.18V10.71c0-0.09-0.04-0.18-0.11-0.18c-0.05,0-0.1,0.02-0.16,0.06l-10.11,6.08c-0.1,0.06-0.13,0.11-0.13,0.16c0,0.04,0.02,0.08,0.09,0.16l7.22,7.22c0.1,0.1,0.16,0.17,0.16,0.25c0,0.09-0.11,0.12-0.23,0.12l-6.54,0c-0.51,0-0.91-0.08-1.18-0.35l-4.38-4.38c-0.04-0.04-0.08-0.07-0.13-0.07c-0.04,0-0.09,0.02-0.14,0.05l-7.33,4.4c-0.44,0.27-0.75,0.35-1.18,0.35H1.53c-0.71,0-1.18-0.47-1.18-1.18v-8.64c0-1.06,0.24-1.67,1.18-2.24l5.63-3.38C7.21,9.1,7.26,9.09,7.31,9.09c0.09,0,0.13,0.09,0.13,0.28v11.55c0,0.12,0.03,0.18,0.11,0.18c0.05,0,0.1-0.03,0.17-0.07L26.73,9.61c0.45-0.27,0.73-0.35,1.25-0.35h10.23c0.71,0,1.18,0.47,1.18,1.18V23.11z"/>
+            </svg>
+            {% block header_right %}{% endblock %}
+        </div>
+    </header>
+
+    <!-- Main -->
+    <main class="max-w-lg mx-auto px-5 pb-24">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bottom Nav — dark like kia.com -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-[#05141f] z-50">
+        <div class="max-w-lg mx-auto flex">
+            <a href="/" class="nav-tab flex-1 flex flex-col items-center gap-1 {% if active_page == 'home' %}active{% endif %}" style="color: {% if active_page == 'home' %}#fff{% else %}#5892af{% endif %}">
+                <svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                <span class="text-[10px] font-bold tracking-wide">Home</span>
+            </a>
+            <a href="/trips" class="nav-tab flex-1 flex flex-col items-center gap-1 {% if active_page == 'trips' %}active{% endif %}" style="color: {% if active_page == 'trips' %}#fff{% else %}#5892af{% endif %}">
+                <svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                <span class="text-[10px] font-bold tracking-wide">Trips</span>
+            </a>
+            <a href="/controls" class="nav-tab flex-1 flex flex-col items-center gap-1 {% if active_page == 'controls' %}active{% endif %}" style="color: {% if active_page == 'controls' %}#fff{% else %}#5892af{% endif %}">
+                <svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                <span class="text-[10px] font-bold tracking-wide">Controls</span>
+            </a>
+            <a href="/car" class="nav-tab flex-1 flex flex-col items-center gap-1 {% if active_page == 'car' %}active{% endif %}" style="color: {% if active_page == 'car' %}#fff{% else %}#5892af{% endif %}">
+                <svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <span class="text-[10px] font-bold tracking-wide">Car</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Toast -->
+    <div id="toast-container" class="fixed bottom-24 left-5 right-5 max-w-lg mx-auto z-[60] pointer-events-none"></div>
+
+    <script>
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const colors = { success: 'bg-k-green', error: 'bg-k-red', info: 'bg-k-blue' };
+            const dot = colors[type] || colors.info;
+            const el = document.createElement('div');
+            el.className = 'pointer-events-auto mb-2 bg-[#05141f] text-white rounded-xl px-4 py-3 shadow-xl flex items-center gap-3 slide-up';
+            el.innerHTML = `<div class="w-2 h-2 rounded-full ${dot} ${type === 'info' ? 'pulse-dot' : ''}"></div><p class="text-[13px]">${message}</p>`;
+            container.appendChild(el);
+            setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+        }
+        async function apiPost(endpoint, body = null, message = null) {
+            if (message) showToast(message, 'info');
+            try {
+                const opts = { method: 'POST' };
+                if (body) { opts.headers = {'Content-Type': 'application/json'}; opts.body = JSON.stringify(body); }
+                const res = await fetch('/api/' + endpoint, opts);
+                const data = await res.json();
+                if (data.error) { showToast('Failed: ' + data.error, 'error'); return null; }
+                showToast('Command sent', 'success');
+                return data;
+            } catch(e) { showToast('Error: ' + e.message, 'error'); return null; }
+        }
+        async function apiGet(endpoint) { const res = await fetch('/api/' + endpoint); return res.json(); }
+    </script>
+    {% block scripts %}{% endblock %}
+    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/js/sw.js').catch(() => {}); }</script>
+</body>
+</html>
