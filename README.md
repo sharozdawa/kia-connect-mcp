@@ -4,7 +4,7 @@
 
 An [MCP](https://modelcontextprotocol.io) server, CLI, and PWA dashboard for any Kia / Hyundai / Genesis vehicle that supports Kia Connect or Hyundai Bluelink. **52 tools**, every cloud-API capability the official app exposes, plus computed insights the official app *doesn't* give you.
 
-Wraps [`hyundai-kia-connect-api`](https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api). Works in every region that library supports — **Europe, USA, Canada, India, South Korea, Australia, China**.
+Wraps [`hyundai-kia-connect-api`](https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api). Works in every region that library supports — **Europe, USA, Canada, India, Australia, New Zealand, China, Brazil**.
 
 ## What you get
 
@@ -61,10 +61,62 @@ Edit `.env`:
 | `KIA_USERNAME` | yes | — | Kia Connect / Hyundai Bluelink email |
 | `KIA_PASSWORD` | yes | — | Account password |
 | `KIA_PIN`      | for write commands | `""` | Required for remote lock/unlock and a few others |
-| `KIA_REGION`   | yes | `6` | 1=Europe 2=Canada 3=USA 4=China 5=Australia **6=India** 7=South Korea |
+| `KIA_REGION`   | yes | `6` | 1=Europe 2=Canada 3=USA 4=China 5=Australia **6=India** 7=New Zealand 8=Brazil |
 | `KIA_BRAND`    | yes | `1` | **1=Kia** 2=Hyundai 3=Genesis |
 | `KIA_TANK_LITERS` | no | `45` | Used by fuel cost / mileage estimates. Look up your model. |
 | `KIA_FUEL_PRICE`  | no | `105` | Local fuel price per liter (any currency). |
+
+---
+
+## Compatible vehicles
+
+Works with any **Kia, Hyundai, or Genesis** vehicle that has an active connected-car subscription:
+
+- **Kia Connect** *(formerly Kia UVO)*
+- **Hyundai Bluelink**
+- **Genesis Connected Services** *(Canada per the upstream library)*
+
+Compatibility is inherited from `hyundai-kia-connect-api`. Broadly: most Kia / Hyundai / Genesis vehicles with an active telematics SIM from roughly **2018 onwards**, across the eight supported regions (Europe, USA, Canada, India, Australia, New Zealand, China, Brazil).
+
+Model names vary by market — your local **Cerato** is a **Forte** in the US and a **K3** in Korea / the Middle East. The MCP doesn't care about the marketing name; it talks to whatever your account returns.
+
+### Kia models (Kia Connect / UVO)
+
+| Body type | Models |
+|---|---|
+| **Sedans** | K3 / Cerato / Forte, K5 / Optima, K8, K9 / K900 / Quoris, Stinger, Rio Sedan, Pegas |
+| **Hatchbacks** | Picanto / Morning, Rio, Ceed, ProCeed, XCeed, Stonic |
+| **SUVs & crossovers** | Soul, Seltos, Sportage, Sorento, Telluride, Niro, Mohave / Borrego, KX1 / KX3 / KX5 / KX7 *(China)* |
+| **MPVs / minivans** | Carens *(India / Asia)*, Carnival / Sedona, Ray |
+| **Electric (EVs)** | EV3, EV4, EV5 *(China)*, EV6, EV9, Niro EV, Soul EV, Ray EV |
+| **Commercial** | Bongo, K2700, K3000 *(where telematics fitted)* |
+
+### Hyundai models (Bluelink)
+
+| Body type | Models |
+|---|---|
+| **Sedans** | Accent / Verna / Solaris, Aura, Elantra / Avante / i30 Sedan, Sonata / i40, Azera / Grandeur, Lafesta *(China)*, Mistra *(China)* |
+| **Hatchbacks** | i10 / Grand i10 / HB20, i20, i30, Bayon, Ioniq *(original hatch)* |
+| **Compact SUVs** | Venue, Exter *(India)*, Casper *(Korea)*, Bayon |
+| **Mid-size SUVs** | Kona / Kauai, Tucson / ix35, Creta / ix25, Mufasa *(China)* |
+| **Large SUVs** | Santa Fe, Palisade, Alcazar *(India)*, Maxcruz *(Korea)* |
+| **MPVs & vans** | Stargazer *(Indonesia)*, Staria, H-1 / Starex, Custo *(China)*, Tucson L *(China)* |
+| **Electric (EVs)** | Ioniq 5, Ioniq 6, Ioniq 9, Kona Electric, Nexo *(hydrogen FCEV)* |
+| **Commercial** | H100, Mighty, Porter *(where telematics fitted)* |
+
+### Genesis models (Genesis Connected Services)
+
+| Body type | Models |
+|---|---|
+| **Sedans** | G70, G80, G90 / EQ900 |
+| **SUVs** | GV60, GV70, GV80 |
+| **Electric (EVs)** | GV60, Electrified G80, Electrified GV70, Electrified GV60 |
+
+### Verified working
+
+- ✅ **Kia Carens Clavis** *(India, 2026 — primary test vehicle for this repo)*
+
+If your model isn't above and you've successfully connected — open a PR and add it. If it doesn't work, [open an issue](https://github.com/sharozdawa/kia-connect-mcp/issues) with your region, brand, model year, and the error you see. Compatibility ultimately depends on **(1)** the upstream library supporting your region, **(2)** your connected-services subscription being active, and **(3)** which features your trim physically has (e.g. AC-only mode is EU-only, exact tire PSI is rare on Asian trims, sunroof status only if equipped).
 
 ---
 
@@ -249,7 +301,7 @@ Open `http://<your-machine>:8000` on your phone and "Add to Home Screen". Server
 - **Rate limit.** Kia/Hyundai's API enforces ~100 calls per window. The PWA caches reads for 2 min to stay polite.
 - **Cached vs live.** Most read tools return what the car last uploaded (usually within minutes). Use `get_live_status` / `force_refresh` only when you genuinely need fresh data — they wake the TCU and drain the 12V slightly. Both are rate-limited to once per 30 min.
 - **PIN.** Lock/unlock and a few other writes need `KIA_PIN` set. Read-only tools do not.
-- **Tested on.** Kia Carens Clavis (India). Should work on any Kia/Hyundai/Genesis vehicle that the upstream library supports — please open an issue or PR with results from your model.
+- **Tested on.** Kia Carens Clavis (India). See [Compatible vehicles](#compatible-vehicles) for the full list of models the underlying library supports — please open an issue or PR with results from your model.
 
 ## Credits
 
